@@ -1,0 +1,48 @@
+function [obj, schedule, savings] = ChargingOptimizer(obj)
+            % Simple optimization: charge during hours with solar availability
+            
+            hours = 24;
+            
+            % Electricity prices (€/kWh)
+            tariff = zeros(24, 1);
+            tariff(1:7) = 0.10;      % Night: cheap
+            tariff(8:16) = 0.15;     % Day: medium
+            tariff(17:22) = 0.25;    % Evening: expensive
+            tariff(23:24) = 0.10;    % Late night: cheap
+            
+            % Energy needed per EV
+            energy_per_ev = 20; % kWh
+            
+            % UNCONTROLLED: Charge immediately when arriving (6 PM)
+            uncontrolled = zeros(24, 1);
+            uncontrolled(18:21) = obj.num_evs * 7.2; % Using 7.2kW directly
+            uncontrolled_cost = sum(uncontrolled .* tariff);
+            
+            % OPTIMIZED: Charge during daylight (10 AM onwards)
+            optimized = zeros(24, 1);
+            total_energy_needed = obj.num_evs * energy_per_ev;
+            hours_needed = ceil(total_energy_needed / (obj.num_evs * config.CHARGER_LEVEL2_POWER));
+            
+            % Shift start to 10 AM (Hour 10) to overlap with solar profile
+            start_hour = 10;
+            optimized(start_hour : start_hour + hours_needed - 1) = obj.num_evs * config.CHARGER_LEVEL2_POWER;
+            
+            % ADDED: Calculate the cost of the optimized schedule
+            optimized_cost = sum(optimized .* tariff); 
+            
+            % Calculate savings
+            savings = uncontrolled_cost - optimized_cost;
+            savings_percent = (savings / uncontrolled_cost) * 100;
+            
+            schedule.uncontrolled = uncontrolled;
+            schedule.optimized = optimized;
+            schedule.tariff = tariff;
+            
+            fprintf('\n=== Optimization Results ===\n');
+            fprintf('Uncontrolled Cost: €%.2f\n', uncontrolled_cost);
+            fprintf('Optimized Cost: €%.2f\n', optimized_cost);
+            fprintf('Daily Savings: €%.2f (%.1f%%)\n', savings, savings_percent);
+            fprintf('Annual Savings: €%.2f\n', savings * 365);
+            
+            obj.schedule = schedule;
+        end
